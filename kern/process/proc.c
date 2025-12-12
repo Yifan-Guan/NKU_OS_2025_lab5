@@ -136,6 +136,8 @@ alloc_proc(void)
          *       uint32_t wait_state;                        // waiting state
          *       struct proc_struct *cptr, *yptr, *optr;     // relations between processes
          */
+        proc->wait_state = 0; 
+        proc->cptr = proc->yptr = proc->optr = NULL;  
     }
     return proc;
 }
@@ -475,6 +477,7 @@ int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
         goto fork_out;
     }
     proc->parent = current;
+    current->wait_state = 0; // set current process's wait_state is 0
     //    2. call setup_kstack to allocate a kernel stack for child process
     if (setup_kstack(proc) != 0){
         goto bad_fork_cleanup_proc;
@@ -485,11 +488,10 @@ int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
     }
     //    4. call copy_thread to setup tf & context in proc_struct
     copy_thread(proc, stack, tf);
-    //    5. insert proc_struct into hash_list && proc_list
-    proc->pid = get_pid();    
+    //    5. insert proc_struct into hash_list && proc_list, set relation links
+    proc->pid = get_pid();
     hash_proc(proc);
-    list_add(&proc_list, &(proc->list_link));
-    nr_process++;
+    set_links(proc);
     //    6. call wakeup_proc to make the new child process RUNNABLE
     wakeup_proc(proc);
     //    7. set ret vaule using child proc's pid
@@ -738,6 +740,11 @@ load_icode(unsigned char *binary, size_t size)
      *          tf->status should be appropriate for user program (the value of sstatus)
      *          hint: check meaning of SPP, SPIE in SSTATUS, use them by SSTATUS_SPP, SSTATUS_SPIE(defined in risv.h)
      */
+    // Set up user-mode trapframe: stack pointer, entry point, and status
+    tf->gpr.sp = USTACKTOP;              // user stack top
+    tf->epc = elf->e_entry;              // entry point of the ELF
+    // Enable interrupts on sret to user and clear SPP to indicate U-mode
+    tf->status = (sstatus | SSTATUS_SPIE) & ~SSTATUS_SPP;
 
     ret = 0;
 out:

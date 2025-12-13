@@ -46,6 +46,7 @@
 创建子进程的函数`do_fork`在执行中将拷贝当前进程（即父进程）的用户内存地址空间中的合法内容到新进程中（子进程），完成内存资源的复制。具体是通过`copy_range`函数（位于kern/mm/pmm.c中）实现的，请补充`copy_range`的实现，确保能够正确执行。
 
 请在实验报告中简要说明你的设计实现过程。
+我们在 kern/mm/pmm.c 中实现了 copy_range，用于在 do_fork（/ dup_mmap）时把父进程指定地址区间 [start, end) 的合法页面逐页复制到子进程的页表中。实现步骤如下：对地址区间逐页查找父进程的 PTE（通过 get_pte(from, la, 0)）。若该页存在且有效，则为子进程分配新物理页（alloc_page()），把父页数据通过 memcpy(page2kva(src), page2kva(dst), PGSIZE) 复制到新页，然后通过 page_insert(to, newpage, la, perm) 在子进程页表中建立映射并设置相应权限。实现保证了在内存不足或映射失败时能正确回滚并返回错误。该方法为“写时复制（COW）”机制启用前的直接复制实现；若要支持 COW，则在 fork 时应改为共享映射并在后续写时触发拷贝。
 
 # 练习3: 阅读分析源代码，理解进程执行 fork/exec/wait/exit 的实现，以及系统调用的实现
 
@@ -217,6 +218,25 @@ User Mode → Trap → Kernel Mode → sret → User Mode
 # Challenge1：实现 Copy on Write （COW）机制
 
    给出实现源码,测试用例和设计报告（包括在cow情况下的各种状态转换（类似有限状态自动机）的说明）。
+设计报告
+COW状态转换图（有限状态自动机）
+┌─────────────────┐    fork()     ┌─────────────────┐
+│   READ/WRITE    │ ────────────► │   READ-ONLY     │
+│   (Private)     │              │   (Shared COW)  │
+└─────────────────┘              └─────────────────┘
+         │                                │
+         │ write access                   │ write access (page fault)
+         │                                │
+         ▼                                ▼
+┌─────────────────┐    copy page   ┌─────────────────┐
+│   READ/WRITE    │ ◄───────────── │   READ/WRITE    │
+│   (Private)     │                │   (Private)     │
+└─────────────────┘                └─────────────────┘
+状态说明：
+READ/WRITE (Private): 页面可读写，只有一个进程拥有
+READ-ONLY (Shared COW): 页面只读，多个进程共享，写时复制
+转换条件：fork()创建共享，写访问触发复制
+
 
 # Challenge2: 说明该用户程序是何时被预先加载到内存中的？与我们常用操作系统的加载有何区别，原因是什么？
 
@@ -255,5 +275,6 @@ User Mode → Trap → Kernel Mode → sret → User Mode
 - 进行动态链接和地址重定位
 - 建立独立的内存映射和页表
 - 设置完整的进程控制块和环境变量
+
 
 这种实验性的设计虽然简化了实现，但也失去了真实系统中进程隔离、动态加载、按需分页等重要特性。

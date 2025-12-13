@@ -215,9 +215,8 @@ User Mode → Trap → Kernel Mode → sret → User Mode
 
 这种设计保证了操作系统的安全性、隔离性和可靠性，是现代操作系统的基本架构模式。
 
-# Challenge1：实现 Copy on Write （COW）机制
+# Challenge1：实现 Copy on Write（COW）机制
 
-# 写时复制（COW）机制设计报告
 ## 1. 概述
 写时复制（Copy-On-Write，COW）是一种优化内存使用的核心技术，核心逻辑为：`fork()`创建子进程时不立即复制父进程内存页，而是让父子共享只读页面；仅当任一进程尝试写页面时，才为该进程复制私有可读写页。该机制大幅降低`fork()`开销，减少无意义的内存复制。
 
@@ -242,6 +241,7 @@ User Mode → Trap → Kernel Mode → sret → User Mode
 │   READ/WRITE    │ ◄───────────── │   READ/WRITE    │
 │   (Private)     │                │   (Private)     │
 └─────────────────┘                └─────────────────┘
+
 
 
 # Challenge2: 说明该用户程序是何时被预先加载到内存中的？与我们常用操作系统的加载有何区别，原因是什么？
@@ -284,4 +284,5 @@ User Mode → Trap → Kernel Mode → sret → User Mode
 
 
 这种实验性的设计虽然简化了实现，但也失去了真实系统中进程隔离、动态加载、按需分页等重要特性。
+
 
